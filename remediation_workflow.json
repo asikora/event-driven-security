@@ -1,0 +1,183 @@
+{
+    "Comment": "Remediation workflow for event driven security",
+    "StartAt": "EventTypeChoice",
+    "States": {
+        "EventTypeChoice": {
+            "Type": "Choice",
+            "Choices": [
+                {
+                    "Variable": "$.detail-type",
+                    "StringEquals": "AWS API Call via CloudTrail",
+                    "Next": "CloudTrailEventChoice"
+                },
+                {
+                    "Variable": "$.detail-type",
+                    "StringEquals": "GuardDuty Finding",
+                    "Next": "GuardDutyEventChoice"
+                }
+            ],
+            "Default": "Fail"
+        },
+        "CloudTrailEventChoice": {
+            "Type": "Choice",
+            "Choices": [
+                {
+                    "Variable": "$.detail.eventName",
+                    "StringEquals": "AuthorizeSecurityGroupIngress",
+                    "Next": "sg-revoke-rule"
+                }
+            ],
+            "Default": "Fail"
+        },
+        "GuardDutyEventChoice": {
+            "Type": "Choice",
+            "Choices": [
+                {
+                    "Variable": "$.detail.type",
+                    "StringEquals": "Backdoor:EC2/C&CActivity.B!DNS",
+                    "Next": "ec2-capture-metadata"
+                },
+                {
+                    "Variable": "$.detail.type",
+                    "StringMatches": "CryptoCurrency:EC2/BitcoinTool.B!DNS",
+                    "Next": "ec2-capture-metadata"
+                }
+            ],
+            "Default": "Fail"
+        },
+        "Fail": {
+            "Type": "Fail",
+            "Cause": "No match!"
+        },
+        "sg-revoke-rule": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+                "Payload.$": "$",
+                "FunctionName": "${sg-revoke-rule-arn}"
+            },
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "Lambda.ServiceException",
+                        "Lambda.AWSLambdaException",
+                        "Lambda.SdkClientException"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 6,
+                    "BackoffRate": 2
+                }
+            ],
+            "End": true
+        },
+        "ec2-capture-metadata": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+                "Payload.$": "$",
+                "FunctionName": "${ec2-capture-metadata-arn}"
+            },
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "Lambda.ServiceException",
+                        "Lambda.AWSLambdaException",
+                        "Lambda.SdkClientException"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 6,
+                    "BackoffRate": 2
+                }
+            ],
+            "ResultPath": null,
+            "Next": "ec2-enable-protection"
+        },
+        "ec2-enable-protection": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+                "Payload.$": "$",
+                "FunctionName": "${ec2-enable-protection-arn}"
+            },
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "Lambda.ServiceException",
+                        "Lambda.AWSLambdaException",
+                        "Lambda.SdkClientException"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 6,
+                    "BackoffRate": 2
+                }
+            ],
+            "ResultPath": null,
+            "Next": "ec2-isolate"
+        },
+        "ec2-isolate": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+                "Payload.$": "$",
+                "FunctionName": "${ec2-isolate-arn}"
+            },
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "Lambda.ServiceException",
+                        "Lambda.AWSLambdaException",
+                        "Lambda.SdkClientException"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 6,
+                    "BackoffRate": 2
+                }
+            ],
+            "ResultPath": null,
+            "Next": "ec2-ebs-snapshot"
+        },
+        "ec2-ebs-snapshot": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+                "Payload.$": "$",
+                "FunctionName": "${ec2-ebs-snapshot-arn}"
+            },
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "Lambda.ServiceException",
+                        "Lambda.AWSLambdaException",
+                        "Lambda.SdkClientException"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 6,
+                    "BackoffRate": 2
+                }
+            ],
+            "ResultPath": null,
+            "Next": "tag-resource"
+        },
+        "tag-resource": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::lambda:invoke",
+            "Parameters": {
+                "Payload.$": "$",
+                "FunctionName": "${tag-resource-arn}"
+            },
+            "Retry": [
+                {
+                    "ErrorEquals": [
+                        "Lambda.ServiceException",
+                        "Lambda.AWSLambdaException",
+                        "Lambda.SdkClientException"
+                    ],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 6,
+                    "BackoffRate": 2
+                }
+            ],
+            "End": true
+        }
+    }
+}
