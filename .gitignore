@@ -4,3 +4,4 @@ tf/.terraform.lock.hcl
 tf/terraform.tfstate.backup
 lambdas/*.zip
 .DS_Store
+test/
